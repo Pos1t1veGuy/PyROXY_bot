@@ -1,4 +1,5 @@
 from aiogram import Router, F
+from keyboards import default_menu
 
 router = Router()
 
@@ -16,7 +17,7 @@ def get_router(author_link: str) -> Router:
             "Если вас заинтересовал данный проект, то для новых пользователей есть бесплатный трехдневный период, но затем "
             "необходимо преобрести подписку.\n"
             f"Если у вас есть вопросы, вы можете связаться с автором: {author_link}",
-            parse_mode="HTML", disable_web_page_preview=True
+            parse_mode="HTML", disable_web_page_preview=True, reply_markup=default_menu
         )
         await callback.answer()
 

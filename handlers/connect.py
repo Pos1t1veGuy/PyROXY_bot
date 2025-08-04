@@ -1,14 +1,15 @@
 from typing import *
 from aiogram import Router, F
-from keyboards import cipher_buttons, select_user_key, default_menu, how_to_connect, balance_menu
+from keyboards import cipher_buttons_menu, select_user_key_menu, default_menu, how_to_connect_menu, balance_menu
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.exceptions import TelegramBadRequest, TelegramAPIError
-from aiogram.types import BufferedInputFile
+from aiogram.types import BufferedInputFile, FSInputFile
 import random
 import string
 import asyncio
 import os
-import hashlib
+
+from .utils import msg_timeout, disable_msg_timeout
 
 
 class KeyInput(StatesGroup):
@@ -43,7 +44,6 @@ class ConnectRouter:
 
         self.router.callback_query.register(self.cmd_connect, F.data == "connect")
         self.router.callback_query.register(self.input_key, F.data.startswith("cipher:"))
-        self.router.callback_query.register(self.cancel, F.data == 'cancel')
         self.router.message.register(self.key_input_received, KeyInput.waiting_for_key)
         self.router.callback_query.register(self.generate_key, F.data == "generate_new_key")
         self.router.callback_query.register(self.find_last_key, F.data == "use_last_key")
@@ -53,20 +53,20 @@ class ConnectRouter:
 
     async def cmd_connect(self, callback, state):
         await self.subscriber_only(callback)
-        sent = await callback.message.answer("🔒 Выберите тип шифрования:", reply_markup=cipher_buttons)
+        sent = await callback.message.answer("🔒 Выберите тип шифрования:", reply_markup=cipher_buttons_menu)
         await callback.answer()
 
-        asyncio.create_task(self._msg_timeout(state, sent, callback.bot))
+        asyncio.create_task(msg_timeout(state, sent, callback.bot))
 
 
     async def generate_key(self, callback, state):
         await self.subscriber_only(callback)
-        await self._disable_msg_timeout(state)
+        await disable_msg_timeout(state)
 
         new_key = self.generate_cipher_key().hex()
         if self.save_key(callback.from_user.username, new_key):
             await callback.message.edit_text(f"✅ Сгенерировала новый ключ: ```{new_key}```",
-                                          reply_markup=how_to_connect, parse_mode='Markdown')
+                                          reply_markup=how_to_connect_menu, parse_mode='Markdown')
         else:
             await message.edit_text(
                 "❌ Ошибка создания ключа. Попробуйте позже.", reply_markup=default_menu
@@ -75,12 +75,12 @@ class ConnectRouter:
 
     async def find_last_key(self, callback, state):
         await self.subscriber_only(callback)
-        await self._disable_msg_timeout(state)
+        await disable_msg_timeout(state)
 
         key = self.find_key(callback.from_user.username)
         if key:
             await callback.message.edit_text(f"✅ Используем прошлый ключ: ```{key}```",
-                                          reply_markup=how_to_connect, parse_mode='Markdown')
+                                          reply_markup=how_to_connect_menu, parse_mode='Markdown')
         else:
             await message.edit_text(
                 "❌ Прошлый ключ не найден.", reply_markup=default_menu
@@ -89,7 +89,7 @@ class ConnectRouter:
 
     async def input_key(self, callback, state):
         await self.subscriber_only(callback)
-        await self._disable_msg_timeout(state)
+        await disable_msg_timeout(state)
 
         cipher_type = callback.data.split(":", 1)[1]
         self.save_password(
@@ -100,21 +100,11 @@ class ConnectRouter:
         self.save_cipher(callback.from_user.username, cipher_type)
         msg = await callback.message.edit_text(
             f"✅ `{cipher_type}`\nА теперь укажите **ключ шифрования** (просто строка с буквами):",
-            reply_markup=select_user_key, parse_mode='Markdown'
+            reply_markup=select_user_key_menu, parse_mode='Markdown'
         )
         await state.update_data(cipher_type=cipher_type, last_msg_id=callback.message.message_id)
         await state.set_state(KeyInput.waiting_for_key)
         await callback.answer()
-
-
-    async def cancel(self, callback, state):
-        try:
-            await callback.message.edit_text(
-                text="❌ Операция отменена",
-                reply_markup=default_menu
-            )
-        except (TelegramBadRequest, TelegramAPIError):
-            pass
 
 
     async def key_input_received(self, message, state):
@@ -127,21 +117,28 @@ class ConnectRouter:
 
         is_valid, msg = self.validate_cipher_key(cipher_type, key)
         if not is_valid:
-            await message.answer(f'❌ Ошибка: {msg}', reply_markup=default_menu)
+            await message.bot.edit_message_text(
+                chat_id=message.chat.id,
+                message_id=last_msg_id,
+                text=f'❌ Ошибка: {msg}',
+                reply_markup=default_menu)
             return
-
-        try:
-            await message.bot.delete_message(chat_id=message.chat.id, message_id=last_msg_id)
-        except (TelegramBadRequest, TelegramAPIError):
-            pass
 
         hex_key = key.encode().hex()
         if self.save_key(message.from_user.username, hex_key):
-            await message.answer(f"✅ Ключ сохранен, вот его hex формат: `{hex_key}`",
-                                 reply_markup=how_to_connect, parse_mode='Markdown')
+            await message.bot.edit_message_text(
+                chat_id=message.chat.id,
+                message_id=last_msg_id,
+                text=f"✅ Ключ сохранен, вот его hex формат: `{hex_key}`",
+                reply_markup=how_to_connect_menu,
+                parse_mode='Markdown'
+            )
         else:
-            await message.answer(
-                "❌ Ошибка создания ключа. Попробуйте позже.", reply_markup=default_menu
+            await message.bot.edit_message_text(
+                chat_id=message.chat.id,
+                message_id=last_msg_id,
+                text="❌ Ошибка создания ключа. Попробуйте позже.",
+                reply_markup=default_menu
             )
         await state.clear()
 
@@ -158,9 +155,10 @@ class ConnectRouter:
                 document=BufferedInputFile(profile_data, filename="profile.pyroxy"),
                 caption=(
                     "🔐 Инструкция по подключению:\n\n"
-                    "1️⃣ Поместите файл `profile.pyroxy` в папку с PyROXY-клиентом.\n"
-                    "2️⃣ Запустите `console_client.exe` или `no_console_client.exe`.\n\n"
-                    "⚠️ Файл содержит:\n"
+                    "1️⃣ Скачайте архив `pyroxy_client.zip` и распакуйте его в любое удобное место, это ваш прокси-клиент.\n"
+                    "2️⃣ Поместите файл `profile.pyroxy` в ту же папку, где находится распакованный клиент.\n"
+                    "3️⃣ Запустите `console_client.exe` или `no_console_client.exe` в папке клиента.\n\n"
+                    "⚠️ Файл `profile.pyroxy` содержит:\n"
                     "• Ваш ключ авторизации\n"
                     "• Пароль\n"
                     "• Настройки шифрования\n\n"
@@ -169,6 +167,10 @@ class ConnectRouter:
                     "Я не несу ответственности за компрометацию данных и за трафик, проходящий через VPN.\n"
                 ),
                 reply_markup=default_menu, parse_mode='Markdown'
+            )
+            await callback.message.answer_document(
+                document=FSInputFile("pyroxy_client.zip"),
+                caption="📦 Это клиент PyROXY. Распакуйте архив и следуйте инструкции."
             )
         else:
             await message.answer("⚠ Чтобы пользоваться VPN нужно преобрести подписку (либо воспользоваться бесплатным"
@@ -215,30 +217,6 @@ class ConnectRouter:
 
     def generate_cipher_key(self) -> str:
         return os.urandom(32)
-
-    async def _msg_timeout(self, state, sent, bot, timeout=60*30):
-        await state.update_data(
-            timeout_msg=[sent.message_id, sent.chat.id]
-        )
-
-        await asyncio.sleep(timeout)
-
-        data = await state.get_data()
-        msg = data.get("timeout_msg")
-
-        if msg != -1:
-            try:
-                await sent.edit_text(
-                    text="⏳ Время на выбор истекло. Попробуйте ещё раз.",
-                    reply_markup=default_menu
-                )
-            except (TelegramBadRequest, TelegramAPIError):
-                pass
-
-    async def _disable_msg_timeout(self, state):
-        await state.update_data(
-            last_send_time=-1
-        )
 
     async def subscriber_only(self, event):
         if not self.is_subscriber(event.from_user.username):

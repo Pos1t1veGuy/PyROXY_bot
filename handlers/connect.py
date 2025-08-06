@@ -1,9 +1,9 @@
 from typing import *
 from aiogram import Router, F
-from keyboards import cipher_buttons_menu, select_user_key_menu, default_menu, how_to_connect_menu, balance_menu
+from keyboards import cipher_buttons_menu, select_user_key_menu, default_menu, how_to_connect_menu, balance_menu, select_tarif_menu
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.exceptions import TelegramBadRequest, TelegramAPIError
-from aiogram.types import BufferedInputFile, FSInputFile
+from aiogram.types import BufferedInputFile, FSInputFile, Message, CallbackQuery
 import random
 import string
 import asyncio
@@ -22,25 +22,12 @@ connect_router = Router()
 class ConnectRouter:
     def __init__(self,
                  server_host: 'str',
-                 is_subscriber: Callable[[str, str], bool],
-                 save_key: Callable[[str, str], bool],
-                 save_cipher: Callable[[str, str], bool],
-                 save_password: Callable[[str, str], bool],
-                 find_key: Callable[[str], str],
-                 find_cipher: Callable[[str], str],
-                 find_password: Callable[[str, str], bool]):
+                 db_handler: 'Handler'):
 
         global connect_router
         self.router = connect_router
-
+        self.db_handler = db_handler
         self.host = server_host
-        self.is_subscriber = is_subscriber
-        self.save_key = save_key
-        self.save_password = save_password
-        self.save_cipher = save_cipher
-        self.find_key = find_key
-        self.find_password = find_password
-        self.find_cipher = find_cipher
 
         self.router.callback_query.register(self.cmd_connect, F.data == "connect")
         self.router.callback_query.register(self.input_key, F.data.startswith("cipher:"))
@@ -52,103 +39,103 @@ class ConnectRouter:
 
 
     async def cmd_connect(self, callback, state):
-        await self.subscriber_only(callback)
-        sent = await callback.message.answer("🔒 Выберите тип шифрования:", reply_markup=cipher_buttons_menu)
-        await callback.answer()
+        if await self.subscriber_only(callback):
+            sent = await callback.message.answer("🔒 Выберите тип шифрования:", reply_markup=cipher_buttons_menu)
+            await callback.answer()
 
-        asyncio.create_task(msg_timeout(state, sent, callback.bot))
+            asyncio.create_task(msg_timeout(state, sent, callback.bot))
 
 
     async def generate_key(self, callback, state):
-        await self.subscriber_only(callback)
-        await disable_msg_timeout(state)
+        if await self.subscriber_only(callback):
+            await disable_msg_timeout(state)
 
-        new_key = self.generate_cipher_key().hex()
-        if self.save_key(callback.from_user.username, new_key):
-            await callback.message.edit_text(f"✅ Сгенерировала новый ключ: ```{new_key}```",
-                                          reply_markup=how_to_connect_menu, parse_mode='Markdown')
-        else:
-            await message.edit_text(
-                "❌ Ошибка создания ключа. Попробуйте позже.", reply_markup=default_menu
-            )
-        await callback.answer()
+            new_key = self.generate_cipher_key().hex()
+            if self.db_handler.save_key(callback.from_user.username, new_key):
+                await callback.message.edit_text(f"✅ Сгенерировала новый ключ: ```{new_key}```",
+                                              reply_markup=how_to_connect_menu, parse_mode='Markdown')
+            else:
+                await message.edit_text(
+                    "❌ Ошибка создания ключа. Попробуйте позже.", reply_markup=default_menu
+                )
+            await callback.answer()
 
     async def find_last_key(self, callback, state):
-        await self.subscriber_only(callback)
-        await disable_msg_timeout(state)
+        if await self.subscriber_only(callback):
+            await disable_msg_timeout(state)
 
-        key = self.find_key(callback.from_user.username)
-        if key:
-            await callback.message.edit_text(f"✅ Используем прошлый ключ: ```{key}```",
-                                          reply_markup=how_to_connect_menu, parse_mode='Markdown')
-        else:
-            await message.edit_text(
-                "❌ Прошлый ключ не найден.", reply_markup=default_menu
-            )
-        await callback.answer()
+            key = self.db_handler.find_key(callback.from_user.username)
+            if key:
+                await callback.message.edit_text(f"✅ Используем прошлый ключ: ```{key}```",
+                                              reply_markup=how_to_connect_menu, parse_mode='Markdown')
+            else:
+                await message.edit_text(
+                    "❌ Прошлый ключ не найден.", reply_markup=default_menu
+                )
+            await callback.answer()
 
     async def input_key(self, callback, state):
-        await self.subscriber_only(callback)
-        await disable_msg_timeout(state)
+        if await self.subscriber_only(callback):
+            await disable_msg_timeout(state)
 
-        cipher_type = callback.data.split(":", 1)[1]
-        self.save_password(
-            callback.from_user.username,
-            random.choices(string.ascii_letters + string.digits, k=random.randint(8,32))
-        )
+            cipher_type = callback.data.split(":")[1]
+            self.db_handler.save_password(
+                callback.from_user.username,
+                ''.join(random.choices(string.ascii_letters + string.digits, k=random.randint(8,32)))
+            )
 
-        self.save_cipher(callback.from_user.username, cipher_type)
-        msg = await callback.message.edit_text(
-            f"✅ `{cipher_type}`\nА теперь укажите **ключ шифрования** (просто строка с буквами):",
-            reply_markup=select_user_key_menu, parse_mode='Markdown'
-        )
-        await state.update_data(cipher_type=cipher_type, last_msg_id=callback.message.message_id)
-        await state.set_state(KeyInput.waiting_for_key)
-        await callback.answer()
+            self.db_handler.save_cipher(callback.from_user.username, cipher_type)
+            msg = await callback.message.edit_text(
+                f"✅ `{cipher_type}`\nА теперь укажите **ключ шифрования** (просто строка с буквами):",
+                reply_markup=select_user_key_menu, parse_mode='Markdown'
+            )
+            await state.update_data(cipher_type=cipher_type, last_msg_id=callback.message.message_id)
+            await state.set_state(KeyInput.waiting_for_key)
+            await callback.answer()
 
 
     async def key_input_received(self, message, state):
-        await self.subscriber_only(message)
-        key = message.text.strip()
+        if await self.subscriber_only(message):
+            key = message.text.strip()
 
-        data = await state.get_data()
-        cipher_type = data.get("cipher_type")
-        last_msg_id = data.get("last_msg_id")
+            data = await state.get_data()
+            cipher_type = data.get("cipher_type")
+            last_msg_id = data.get("last_msg_id")
 
-        is_valid, msg = self.validate_cipher_key(cipher_type, key)
-        if not is_valid:
-            await message.bot.edit_message_text(
-                chat_id=message.chat.id,
-                message_id=last_msg_id,
-                text=f'❌ Ошибка: {msg}',
-                reply_markup=default_menu)
-            return
+            is_valid, msg = self.validate_cipher_key(cipher_type, key)
+            if not is_valid:
+                await message.bot.edit_message_text(
+                    chat_id=message.chat.id,
+                    message_id=last_msg_id,
+                    text=f'❌ Ошибка: {msg}',
+                    reply_markup=default_menu)
+                return
 
-        hex_key = key.encode().hex()
-        if self.save_key(message.from_user.username, hex_key):
-            await message.bot.edit_message_text(
-                chat_id=message.chat.id,
-                message_id=last_msg_id,
-                text=f"✅ Ключ сохранен, вот его hex формат: `{hex_key}`",
-                reply_markup=how_to_connect_menu,
-                parse_mode='Markdown'
-            )
-        else:
-            await message.bot.edit_message_text(
-                chat_id=message.chat.id,
-                message_id=last_msg_id,
-                text="❌ Ошибка создания ключа. Попробуйте позже.",
-                reply_markup=default_menu
-            )
-        await state.clear()
+            hex_key = key.encode().hex()
+            if self.db_handler.save_key(message.from_user.username, hex_key):
+                await message.bot.edit_message_text(
+                    chat_id=message.chat.id,
+                    message_id=last_msg_id,
+                    text=f"✅ Ключ сохранен, вот его hex формат: `{hex_key}`",
+                    reply_markup=how_to_connect_menu,
+                    parse_mode='Markdown'
+                )
+            else:
+                await message.bot.edit_message_text(
+                    chat_id=message.chat.id,
+                    message_id=last_msg_id,
+                    text="❌ Ошибка создания ключа. Попробуйте позже.",
+                    reply_markup=default_menu
+                )
+            await state.clear()
 
 
     async def connect_guide(self, callback, state):
         username = callback.from_user.username
-        if self.is_subscriber(username):
-            key = self.find_key(username)
-            password = self.find_password(username)
-            cipher = self.cipher_to_parameter(self.find_cipher(username))
+        if self.db_handler.is_subscriber(username):
+            key = self.db_handler.find_key(username)
+            password = self.db_handler.find_password(username)
+            cipher = self.cipher_to_parameter(self.db_handler.find_cipher(username))
             profile_data = f'host={self.host}\nusername={username}\npassword={password}\nkey={key}\ncipher={cipher}'.encode()
 
             await callback.message.answer_document(
@@ -173,8 +160,9 @@ class ConnectRouter:
                 caption="📦 Это клиент PyROXY. Распакуйте архив и следуйте инструкции."
             )
         else:
-            await message.answer("⚠ Чтобы пользоваться VPN нужно преобрести подписку (либо воспользоваться бесплатным"
-                                 "Трехдневным периодом, но это секрет)", reply_markup=balance_menu)
+            await callback.message.answer("⚠ Чтобы пользоваться VPN нужно преобрести платный доступ (либо воспользоваться"
+                                          " <b><u>бесплатным трехдневным периодом</u></b>, но это секрет)",
+                                          reply_markup=select_tarif_menu, parse_mode="HTML")
 
         await callback.answer()
 
@@ -218,10 +206,14 @@ class ConnectRouter:
     def generate_cipher_key(self) -> str:
         return os.urandom(32)
 
-    async def subscriber_only(self, event):
-        if not self.is_subscriber(event.from_user.username):
-            text = "❌ Для данного действия необходимо преобрести подписку"
+    async def subscriber_only(self, event) -> bool:
+        if not self.db_handler.is_subscriber(event.from_user.username):
+            text = "❌ Чтобы использовать эту функцию, активируйте доступ"
             if isinstance(event, CallbackQuery):
                 await event.message.answer(text, reply_markup=balance_menu)
             elif isinstance(event, Message):
                 await event.answer(text, reply_markup=balance_menu)
+            await event.answer()
+            return False
+
+        return True

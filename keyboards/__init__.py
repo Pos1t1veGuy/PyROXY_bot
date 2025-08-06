@@ -15,7 +15,7 @@ default_menu = InlineKeyboardMarkup(inline_keyboard=[
 main_menu = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text="🌐 О VPN", callback_data="about")],
     [InlineKeyboardButton(text="🔑 Подключить VPN", callback_data="connect")],
-    [InlineKeyboardButton(text="💳 Подписка", callback_data="subscription")],
+    [InlineKeyboardButton(text="💳 Доступ", callback_data="subscription")],
     [InlineKeyboardButton(text="❓ Как подключиться", callback_data="connect_guide")],
 ])
 
@@ -29,19 +29,24 @@ how_to_connect_menu = InlineKeyboardMarkup(inline_keyboard=[
 ])
 
 select_user_key_menu = InlineKeyboardMarkup(inline_keyboard=[
-    [InlineKeyboardButton(text="🔁 Использовать предыдущий ключ", callback_data="use_last_key")],
+    [InlineKeyboardButton(text="♻️ Использовать предыдущий ключ", callback_data="use_last_key")],
     [InlineKeyboardButton(text="🎲 Сгенерировать случайный ключ", callback_data="generate_new_key")],
     [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel")],
 ])
 
+select_tarif_menu = InlineKeyboardMarkup(inline_keyboard=[
+    [InlineKeyboardButton(text="💰 Пополнить", callback_data="top_up")],
+    [InlineKeyboardButton(text="📊 Тарифы", callback_data="pricing")],
+    [InlineKeyboardButton(text="🏠 На главную", callback_data="cancel:delete")],
+])
 balance_menu = InlineKeyboardMarkup(inline_keyboard=[
-    [InlineKeyboardButton(text="Пополнить", callback_data="top_up")],
-    [InlineKeyboardButton(text="Тарифы", callback_data="pricing")],
+    [InlineKeyboardButton(text="💰 Пополнить", callback_data="top_up")],
+    [InlineKeyboardButton(text="📊 Тарифы", callback_data="pricing")],
     [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel")],
 ])
 
 payment_methods_menu = InlineKeyboardMarkup(inline_keyboard=[
-    *[[InlineKeyboardButton(text=f'{method}', callback_data=f"method:{method}")] for method in payment_methods],
+    *[[InlineKeyboardButton(text=f'💳 {method}', callback_data=f"method:{method}")] for method in payment_methods],
     [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel")],
 ])
 confirm_payment_menu = InlineKeyboardMarkup(inline_keyboard=[
@@ -49,17 +54,25 @@ confirm_payment_menu = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel")],
 ])
 money_to_pay_menu = InlineKeyboardMarkup(inline_keyboard=[
-    *[[InlineKeyboardButton(text=f'{money} рублей', callback_data=f"confirm_payment:{money}")] for money in money_to_pay],
+    *[[InlineKeyboardButton(text=f'💵 {money} рублей', callback_data=f"confirm_payment:{money}")] for money in money_to_pay],
     [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel")],
 ])
 
+pricing_item = lambda com, pr: f'{com} 📅{" " * (len(com) - len(pr))}{pr}'
 pricing_menu = InlineKeyboardMarkup(inline_keyboard=[
     *[
         [InlineKeyboardButton(
-            text=f'{price["comment"]} 📅 {price["price"]}р.',
-            callback_data=f"confirm_buy:{name}:{price['price']}:{price['once']}"
+            text=f'{price["comment"]} {f"{price["price"]}р." if price["price"] != 0 else "бесплатно"} единоразово',
+            callback_data=f"confirm_buy:{name}:{price['price']}:{price['once']}:{price['duration_days']}"
         )]
-        for name, price in pricing.items()
+        for name, price in pricing.items() if price["once"]
+    ],
+    *[
+        [InlineKeyboardButton(
+            text=pricing_item(price["comment"], f'{price["price"]}р.'),
+            callback_data=f"confirm_buy:{name}:{price['price']}:{price['once']}:{price['duration_days']}"
+        )]
+        for name, price in pricing.items() if not price["once"]
     ],
     [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel")],
 ])

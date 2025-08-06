@@ -2,7 +2,7 @@ import json
 import asyncio
 from aiogram import Bot, Dispatcher
 from handlers import start, about, connect, subtion
-from db_handler import is_subscriber, save_key, save_cipher, save_password, find_key, find_cipher, find_password, get_user_balance, is_first_free_3_days
+from db_handler import SQLite_Handler
 
 CONFIG_FILE = 'config.json'
 
@@ -15,14 +15,11 @@ host = config['host']
 bot = Bot(token=config["API_TOKEN"])
 dp = Dispatcher()
 
-dp.include_router(start.get_router())
+db_handler = SQLite_Handler()
+dp.include_router(start.get_router(db_handler))
 dp.include_router(about.get_router(author_link))
-dp.include_router(connect.ConnectRouter(
-    host, is_subscriber, save_key, save_cipher, save_password, find_key, find_cipher, find_password
-).router)
-dp.include_router(subtion.SubtionRouter(
-    get_user_balance, is_first_free_3_days
-).router)
+dp.include_router(connect.ConnectRouter(host, db_handler).router)
+dp.include_router(subtion.SubtionRouter(db_handler).router)
 
 if __name__ == "__main__":
     asyncio.run(dp.start_polling(bot))

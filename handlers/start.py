@@ -5,11 +5,12 @@ from keyboards import main_menu, default_menu
 from aiogram.exceptions import TelegramBadRequest, TelegramAPIError
 
 
-def get_router() -> Router:
+def get_router(db_handler: 'Handler') -> Router:
     router = Router()
 
     @router.message(Command("start"))
     async def cmd_start(message):
+        db_handler.add_user(message.from_user.username)
         await message.answer(
             "Привет! Я - Рокси, твой помощник для доступа к прокси-серверу PyROXY.\n\n"
             "Через меня ты можешь получить учётные данные для подключения к прокси и управлять доступом.\n\n"
@@ -17,13 +18,18 @@ def get_router() -> Router:
             parse_mode="Markdown", reply_markup=main_menu
         )
 
-    @router.callback_query(F.data == 'cancel')
+    @router.callback_query(F.data.startswith("cancel"))
     async def cancel(callback, state):
         try:
-            await callback.message.edit_text(
-                text="❌ Операция отменена",
-                reply_markup=default_menu
-            )
+            args = callback.data.split(":")
+            if args[-1] == 'delete' and len(args) > 1:
+                await callback.message.delete()
+            else:
+                await callback.message.edit_text(
+                    text="❌ Операция отменена",
+                    reply_markup=default_menu
+                )
+
         except (TelegramBadRequest, TelegramAPIError):
             pass
 

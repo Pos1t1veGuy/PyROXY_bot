@@ -21,13 +21,15 @@ connect_router = Router()
 
 class ConnectRouter:
     def __init__(self,
-                 server_host: 'str',
+                 server_host: str,
+                 default_server_key: str,
                  db_handler: 'Handler'):
 
         global connect_router
         self.router = connect_router
         self.db_handler = db_handler
         self.host = server_host
+        self.default_server_key = default_server_key
 
         self.router.callback_query.register(self.cmd_connect, F.data == "connect")
         self.router.callback_query.register(self.input_key, F.data.startswith("cipher:"))
@@ -136,7 +138,8 @@ class ConnectRouter:
             key = self.db_handler.find_key(username)
             password = self.db_handler.find_password(username)
             cipher = self.cipher_to_parameter(self.db_handler.find_cipher(username))
-            profile_data = f'host={self.host}\nusername={username}\npassword={password}\nkey={key}\ncipher={cipher}'.encode()
+            profile_data = (f'host={self.host}\nusername={username}\npassword={password}\nkey={key}\n'
+                            f'cipher={cipher}\ndefault_key={self.default_server_key}').encode()
 
             await callback.message.answer_document(
                 document=BufferedInputFile(profile_data, filename="profile.pyroxy"),

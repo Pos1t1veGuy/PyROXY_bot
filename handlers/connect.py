@@ -1,6 +1,7 @@
 from typing import *
 from aiogram import Router, F
-from keyboards import cipher_buttons_menu, select_user_key_menu, default_menu, how_to_connect_menu, balance_menu, select_tarif_menu
+from keyboards import (cipher_buttons_menu, select_user_key_menu, default_menu, how_to_connect_menu, balance_menu,
+                       select_tarif_menu, password_menu)
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.exceptions import TelegramBadRequest, TelegramAPIError
 from aiogram.types import BufferedInputFile, FSInputFile, Message, CallbackQuery
@@ -23,26 +24,73 @@ class ConnectRouter:
     def __init__(self,
                  server_host: str,
                  default_server_key: str,
+                 ciphers: List[str],
                  db_handler: 'Handler'):
 
         global connect_router
         self.router = connect_router
         self.db_handler = db_handler
         self.host = server_host
+        self.ciphers = ciphers
         self.default_server_key = default_server_key
 
-        self.router.callback_query.register(self.cmd_connect, F.data == "connect")
+        # guides
+        self.router.callback_query.register(self.connect_guide, F.data == "connect_guide")
+        self.router.callback_query.register(self.encryption_guide, F.data == "encryption_guide")
+
+        # password
+        self.router.callback_query.register(self.cmd_connect, F.data.startswith("connect"))
+        self.router.callback_query.register(self.generate_pw, F.data == "generate_new_pw")
+        self.router.callback_query.register(self.find_last_pw, F.data == "use_last_pw")
+
+        # cipher
         self.router.callback_query.register(self.input_key, F.data.startswith("cipher:"))
+        self.router.callback_query.register(self.choose_cipher, F.data == "choose_cipher")
         self.router.message.register(self.key_input_received, KeyInput.waiting_for_key)
         self.router.callback_query.register(self.generate_key, F.data == "generate_new_key")
         self.router.callback_query.register(self.find_last_key, F.data == "use_last_key")
-        self.router.callback_query.register(self.connect_guide, F.data == "connect_guide")
 
 
 
     async def cmd_connect(self, callback, state):
         if await self.subscriber_only(callback):
-            sent = await callback.message.answer("🔒 Выберите тип шифрования:", reply_markup=cipher_buttons_menu)
+            if callback.data.split(":")[-1] == 'back':
+                method = callback.message.edit_text
+            else:
+                method = callback.message.answer
+
+            sent = await method("🔒 <b>Нужно выбрать пароль</b>, с помощью которого вы будете проходить авторизацию в "
+                                "прокси сети.\n\n⚠️ Обратите внимание, что пароль нельзя показывать посторонним!",
+                                reply_markup=password_menu, parse_mode='HTML')
+            await callback.answer()
+
+            asyncio.create_task(msg_timeout(state, sent, callback.bot))
+
+    async def generate_pw(self, callback, state):
+        if await self.subscriber_only(callback):
+            await disable_msg_timeout(state)
+
+            new_pw = ''.join(random.choices(string.ascii_letters + string.digits, k=random.randint(8, 32)))
+            self.db_handler.save_password(callback.from_user.username, new_pw)
+
+            await self.choose_cipher(callback, state)
+
+    async def find_last_pw(self, callback, state):
+        if await self.subscriber_only(callback):
+            await disable_msg_timeout(state)
+            pw = self.db_handler.find_password(callback.from_user.username)
+            if pw:
+                await self.choose_cipher(callback, state)
+            else:
+                await callback.message.edit_text("❌ Прошлый пароль не найден.", reply_markup=default_menu)
+
+
+    async def choose_cipher(self, callback, state):
+        if await self.subscriber_only(callback):
+            sent = await callback.message.edit_text("🔒 <b>Требуется выбрать тип шифрования</b>, которым будет покрываться "
+                                                    "ваш трафик.\n\nℹ️ Подробнее о шифровании в главном меню, для"
+                                                    "наибольшей скорости поспользуйтесь <b>default</b> (без шифра).",
+                                                    reply_markup=cipher_buttons_menu, parse_mode='HTML')
             await callback.answer()
 
             asyncio.create_task(msg_timeout(state, sent, callback.bot))
@@ -81,12 +129,13 @@ class ConnectRouter:
             await disable_msg_timeout(state)
 
             cipher_type = callback.data.split(":")[1]
-            self.db_handler.save_password(
-                callback.from_user.username,
-                ''.join(random.choices(string.ascii_letters + string.digits, k=random.randint(8,32)))
-            )
 
-            self.db_handler.save_cipher(callback.from_user.username, cipher_type)
+            if cipher_type == 'back':
+                data = await state.get_data()
+                cipher_type = data.get("cipher_type")
+            else:
+                self.db_handler.save_cipher(callback.from_user.username, cipher_type)
+
             msg = await callback.message.edit_text(
                 f"✅ `{cipher_type}`\nА теперь укажите **ключ шифрования** (просто строка с буквами):",
                 reply_markup=select_user_key_menu, parse_mode='Markdown'
@@ -144,7 +193,7 @@ class ConnectRouter:
             await callback.message.answer_document(
                 document=BufferedInputFile(profile_data, filename="profile.pyroxy"),
                 caption=(
-                    "🔐 Инструкция по подключению:\n\n"
+                    "🔐 ИНСТРУКЦИЯ ПО ПОДКЛЮЧЕНИЮ:\n\n"
                     "1️⃣ Скачайте архив `pyroxy_client.zip` и распакуйте его в любое удобное место, это ваш прокси-клиент.\n"
                     "2️⃣ Поместите файл `profile.pyroxy` в ту же папку, где находится распакованный клиент.\n"
                     "3️⃣ Запустите `console_client.exe` или `no_console_client.exe` в папке клиента.\n\n"
@@ -167,6 +216,14 @@ class ConnectRouter:
                                           " <b><u>бесплатным трехдневным периодом</u></b>, но это секрет)",
                                           reply_markup=select_tarif_menu, parse_mode="HTML")
 
+        await callback.answer()
+
+    async def encryption_guide(self, callback, state):
+        await callback.message.answer("🔒 **ДОСТУПНЫЕ АЛГОРИТМЫ ШИФРОВАНИЯ:**\n\n" + '\n'.join([
+                f'*{name}*\n{description}\n' for name, description in self.ciphers.items()
+            ]),
+            reply_markup=default_menu, parse_mode='Markdown'
+        )
         await callback.answer()
 
 

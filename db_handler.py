@@ -1,3 +1,4 @@
+from typing import *
 import sqlite3
 import random
 import string
@@ -52,14 +53,46 @@ class SQLite_Handler(Handler):
             pass
         return False
 
-    def buy(self, username: str, tarif_name: str, duration_days: int):
+    def buy(self, username: str, tariff_name: str, duration_days: int, price: int) -> bool:
         with sqlite3.connect(self.filepath) as conn:
             cursor = conn.cursor()
+
+            cursor.execute("SELECT balance FROM users WHERE username = ?", (username,))
+            row = cursor.fetchone()
+
+            if row is None: # user not exists
+                return False
+            balance = row[0]
+            if balance < price: # not enough money
+                return False
+
+            cursor.execute('''
+                        SELECT MAX(expires_at) FROM buys
+                        WHERE username = ? AND tariff_name = ?
+                    ''', (username, tariff_name))
+            last_expiry_row = cursor.fetchone()
+            last_expiry = last_expiry_row[0] if last_expiry_row and last_expiry_row[0] else None
+
+            now = datetime.now()
+            if last_expiry:
+                last_expiry_dt = datetime.fromisoformat(last_expiry)
+                start_time = max(now, last_expiry_dt)
+            else:
+                start_time = now
+            new_expiry = start_time + timedelta(days=duration_days)
+
+            cursor.execute("UPDATE users SET balance = ? WHERE username = ?", (balance - price, username))
+
             cursor.execute(
-                "INSERT INTO buys (username, tariff_name, expires_at) VALUES (?, ?, ?)",
-                (username, tarif_name, datetime.now() + timedelta(days=duration_days))
+                """
+                INSERT INTO buys (username, tariff_name, expires_at)
+                VALUES (?, ?, ?)
+                """,
+                (username, tariff_name, new_expiry.isoformat())
             )
+
             conn.commit()
+            return True
 
     def pay(self, username: str, amount: int) -> bool:
         if amount <= 0:
@@ -139,7 +172,19 @@ class SQLite_Handler(Handler):
             result = cursor.fetchone()
             return result[0] if result else 0
 
-    def is_first_free_3_days(self, username: str, free_3_days_tarif_name: str = "free_3_days") -> bool:
+    def get_access_expiry(self, username: str) -> Optional[datetime]:
+        with sqlite3.connect(self.filepath) as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT MAX(expires_at) FROM buys
+                WHERE username = ? AND expires_at > CURRENT_TIMESTAMP
+            ''', (username,))
+            result = cursor.fetchone()
+            if result and result[0]:
+                return datetime.fromisoformat(result[0])
+            return None
+
+    def tarif_was(self, username: str, tarif_name: str = "free_3_days") -> bool:
         with sqlite3.connect(self.filepath) as conn:
             cursor = conn.cursor()
             cursor.execute('''
@@ -147,11 +192,11 @@ class SQLite_Handler(Handler):
                 WHERE username = ? AND tariff_name = ?
                 ORDER BY bought_at ASC
                 LIMIT 1
-            ''', (username, free_3_days_tarif_name))
+            ''', (username, tarif_name))
             result = cursor.fetchone()
             if result is None:
                 return True
 
-            first_buy_date = datetime.datetime.fromisoformat(result[0])
-            now = datetime.datetime.now()
+            first_buy_date = datetime.fromisoformat(result[0])
+            now = datetime.now()
             return (now - first_buy_date).days < 3

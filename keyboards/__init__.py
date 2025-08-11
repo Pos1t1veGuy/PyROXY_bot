@@ -3,7 +3,7 @@ import json
 
 config = json.load(open("config.json", 'r', encoding='utf-8'))
 bot_url = config["bot_url"]
-ciphers = config["ciphers"]
+ciphers_names = list(config["ciphers"].keys())
 payment_methods = config["payment_methods"]
 pricing = config["pricing"]
 money_to_pay = config["money_to_pay"]
@@ -14,24 +14,37 @@ default_menu = InlineKeyboardMarkup(inline_keyboard=[
 ])
 main_menu = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text="🌐 О VPN", callback_data="about")],
-    [InlineKeyboardButton(text="🔑 Подключить VPN", callback_data="connect")],
+    [InlineKeyboardButton(text="🔑 Подключение VPN", callback_data="connect")],
     [InlineKeyboardButton(text="💳 Доступ", callback_data="subscription")],
+    [InlineKeyboardButton(text="🔒 Шифрование", callback_data="encryption_guide")],
     [InlineKeyboardButton(text="❓ Как подключиться", callback_data="connect_guide")],
 ])
 
-cipher_buttons_menu = InlineKeyboardMarkup(inline_keyboard=[
-    *[[InlineKeyboardButton(text=f'🔒 {cipher}', callback_data=f"cipher:{cipher}")] for cipher in ciphers],
+password_menu = InlineKeyboardMarkup(inline_keyboard=[
+    [InlineKeyboardButton(text="♻️ Использовать предыдущий пароль", callback_data="use_last_pw")],
+    [InlineKeyboardButton(text="🎲 Сгенерировать случайный пароль", callback_data="generate_new_pw")],
     [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel")],
+])
+cipher_buttons_menu = InlineKeyboardMarkup(inline_keyboard=[
+    *[
+        [InlineKeyboardButton(text=f'🔒 {ciphers_names[i]}', callback_data=f"cipher:{ciphers_names[i]}"),
+         InlineKeyboardButton(text=f'🔒 {ciphers_names[i+1]}', callback_data=f"cipher:{ciphers_names[i+1]}")]
+        for i in range(0, len(ciphers_names), 2)
+    ],
+    [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel"),
+     InlineKeyboardButton(text="◀️ Назад", callback_data="connect:back")],
 ])
 how_to_connect_menu = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text="🏠 На главную", url=f"{bot_url}?start=main")],
     [InlineKeyboardButton(text="❓ Подключиться", callback_data="connect_guide")],
+    [InlineKeyboardButton(text="◀️ Назад", callback_data="cipher:back")],
 ])
 
 select_user_key_menu = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text="♻️ Использовать предыдущий ключ", callback_data="use_last_key")],
     [InlineKeyboardButton(text="🎲 Сгенерировать случайный ключ", callback_data="generate_new_key")],
-    [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel")],
+    [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel"),
+     InlineKeyboardButton(text="◀️ Назад", callback_data="choose_cipher")],
 ])
 
 select_tarif_menu = InlineKeyboardMarkup(inline_keyboard=[
@@ -47,15 +60,18 @@ balance_menu = InlineKeyboardMarkup(inline_keyboard=[
 
 payment_methods_menu = InlineKeyboardMarkup(inline_keyboard=[
     *[[InlineKeyboardButton(text=f'💳 {method}', callback_data=f"method:{method}")] for method in payment_methods],
-    [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel")],
+    [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel"),
+     InlineKeyboardButton(text="◀️ Назад", callback_data="subscription:back")],
 ])
 confirm_payment_menu = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text="✅ Подтвердить", callback_data="payment")],
-    [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel")],
+    [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel"),
+     InlineKeyboardButton(text="◀️ Назад", callback_data="method:back")],
 ])
 money_to_pay_menu = InlineKeyboardMarkup(inline_keyboard=[
     *[[InlineKeyboardButton(text=f'💵 {money} рублей', callback_data=f"confirm_payment:{money}")] for money in money_to_pay],
-    [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel")],
+    [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel"),
+     InlineKeyboardButton(text="◀️ Назад", callback_data="top_up")],
 ])
 
 pricing_item = lambda com, pr: f'{com} 📅{" " * (len(com) - len(pr))}{pr}'
@@ -74,9 +90,11 @@ pricing_menu = InlineKeyboardMarkup(inline_keyboard=[
         )]
         for name, price in pricing.items() if not price["once"]
     ],
-    [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel")],
+    [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel"),
+     InlineKeyboardButton(text="◀️ Назад", callback_data="subscription:back")],
 ])
 confirm_buy_menu = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text="✅ Купить", callback_data="buy")],
-    [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel")],
+    [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel"),
+     InlineKeyboardButton(text="◀️ Назад", callback_data="pricing")],
 ])

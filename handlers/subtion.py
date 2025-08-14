@@ -1,28 +1,39 @@
 from typing import *
 from aiogram import Router, F
+from aiogram.fsm.state import StatesGroup, State
 from datetime import datetime, timedelta
 from keyboards import (balance_menu, default_menu, payment_methods_menu, pricing_menu, money_to_pay_menu,
-                       confirm_buy_menu, confirm_payment_menu)
+                       confirm_buy_menu, confirm_payment_menu, confirm_not_invoice_menu)
 import asyncio
 
 from .utils import msg_timeout, disable_msg_timeout
+
+
+class DetailsInput(StatesGroup):
+    waiting_for_key = State()
 
 
 subtion_router = Router()
 
 
 class SubtionRouter:
-    def __init__(self, db_handler: 'Handler'):
+    def __init__(self, db_handler: 'Handler', payment_methods: Dict[str, str], author_id: int,
+                 after_not_invoice_payment: Optional[Callable[[str, int, str], None]] = None):
 
         global subtion_router
         self.router = subtion_router
+        self.payment_methods = payment_methods
+        self.after_not_invoice_payment = after_not_invoice_payment
         self.db_handler = db_handler
+        self.author_id = author_id
 
         self.router.callback_query.register(self.cmd_subtion, F.data.startswith("subscription"))
         self.router.callback_query.register(self.top_up, F.data == "top_up")
         self.router.callback_query.register(self.select_method, F.data.startswith("method:"))
         self.router.callback_query.register(self.confirm_payment, F.data.startswith("confirm_payment:"))
+        self.router.message.register(self.details_input_received, DetailsInput.waiting_for_key)
         self.router.callback_query.register(self.payment, F.data == "payment")
+
         self.router.callback_query.register(self.pricing, F.data == "pricing")
         self.router.callback_query.register(self.confirm_buy, F.data.startswith("confirm_buy:"))
         self.router.callback_query.register(self.buy, F.data == "buy")
@@ -55,35 +66,113 @@ class SubtionRouter:
             method = data.get("method")
 
         await state.update_data(method=method)
-        sent = await callback.message.edit_text(
-            f"💳 Выбран способ пополнения: `{method}`. Укажите сумму оплаты",
-            reply_markup=money_to_pay_menu, parse_mode="Markdown"
-        )
+        method_data = self.payment_methods[method]
+
+        if method_data['invoice']:
+            sent = await callback.message.edit_text(
+                f"💳 Выбран способ пополнения: `{method}`. Укажите сумму оплаты",
+                reply_markup=money_to_pay_menu, parse_mode="Markdown"
+            )
+        else:
+            sent = await callback.message.edit_text(
+                f"💳 Выбран способ пополнения: `{method}`. Чтобы пополнить счет бота необходимо перевести нужную сумму "
+                f"на счет администрации, деньги будут начислены в течение нескольких часов. Вот реквизиты: \n\n"
+                f"`{method_data['token']}`\n\nПодтвердите, что деньги были отправлены вами на указанный счет:",
+                reply_markup=confirm_not_invoice_menu, parse_mode="Markdown"
+            )
 
         await callback.answer()
         asyncio.create_task(msg_timeout(state, sent, callback.bot))
 
     async def confirm_payment(self, callback, state):
         await disable_msg_timeout(state)
-        money = int(callback.data.split(":")[1])
+        money = callback.data.split(":")[1]
         await state.update_data(money=money)
 
-        sent = await callback.message.edit_text("Подтвердите оплату:", reply_markup=confirm_payment_menu)
+        data = await state.get_data()
+        method = data.get("method")
+        method_data = self.payment_methods[method]
+
+        if method_data['invoice']:
+            sent = await callback.message.edit_text("Подтвердите оплату:", reply_markup=confirm_payment_menu)
+        else:
+            sent = await callback.message.edit_text(
+                "✏️ Пожалуйста, введите реквизиты, с которых был отправлен платёж.\n"
+                "Например:\n"
+                "• Номер карты\n"
+                "• Номер телефона, привязанного к карте\n\n"
+                "Проверьте введенные данные перед отправкой, в случае возникновения проблем, возможна связь с админом из"
+                " главного меню.",
+                reply_markup=default_menu
+            )
+            await state.update_data(bot_message_id=sent.message_id)
+            await state.set_state(DetailsInput.waiting_for_key)
+
         await callback.answer()
 
         asyncio.create_task(msg_timeout(state, sent, callback.bot))
+
+    async def details_input_received(self, message, state):
+        self.db_handler.add_pending_payment(message.from_user.username, message.from_user.id, message.text.strip(),
+                                            do_after=self.after_not_invoice_payment)
+        try:
+            await message.delete()
+        except Exception:
+            pass
+
+        data = await state.get_data()
+        bot_message_id = data.get("bot_message_id")
+        text = f"🎉 Ожидайте поступления денег на счет... Зачисление должно произойти в течение нескольких часов"
+
+        if bot_message_id:
+            try:
+                await message.bot.edit_message_text(
+                    chat_id=message.chat.id,
+                    message_id=bot_message_id,
+                    text=text,
+                    reply_markup=default_menu
+                )
+            except:
+                await message.answer(text, reply_markup=default_menu)
+        else:
+            await message.answer(text, reply_markup=default_menu)
+
+        try:
+            await message.bot.send_message(
+                self.author_id,
+                f"💰 Новый запрос на пополнение!\n"
+                f"👤 Пользователь: @{message.from_user.username} (ID: {message.from_user.id})\n"
+                f"📄 Детали: {message.text.strip()}"
+            )
+        except Exception as e:
+            print(f"Ошибка отправки админу: {e}")
+
+        await state.clear()
 
     async def payment(self, callback, state):
         await disable_msg_timeout(state)
 
         data = await state.get_data()
         method = data.get("method")
-        money = int(data.get("money"))
+        method_data = self.payment_methods[method]
 
-        # TODO
+        money = int(data.get("money"))
+        # TODO: доделать оплату инвойсами
+        await callback.bot.send_invoice(
+            chat_id=callback.message.chat.id,
+            title="Оплата тарифа PyROXY",
+            description=f"Метод оплаты: {method}",
+            payload="custom_payload_data",
+            provider_token=self.payment_methods[method],
+            currency="RUB",
+            prices=[
+                # types.LabeledPrice(label="Пополнение баланса", amount=money * 100)
+            ],
+            start_parameter=f"proxy-{money}r",
+            is_flexible=False
+        )
         self.db_handler.pay(callback.from_user.username, money)
         await callback.message.edit_text(f"🎉 Оплата прошла успешно! {method} {money}", reply_markup=default_menu)
-
 
     async def pricing(self, callback, state):
         await disable_msg_timeout(state)

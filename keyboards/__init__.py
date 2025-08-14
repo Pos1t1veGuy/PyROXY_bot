@@ -4,7 +4,7 @@ import json
 config = json.load(open("config.json", 'r', encoding='utf-8'))
 bot_url = config["bot_url"]
 ciphers_names = list(config["ciphers"].keys())
-payment_methods = config["payment_methods"]
+payment_methods = config["payment_methods"].items()
 pricing = config["pricing"]
 money_to_pay = config["money_to_pay"]
 
@@ -59,7 +59,7 @@ balance_menu = InlineKeyboardMarkup(inline_keyboard=[
 ])
 
 payment_methods_menu = InlineKeyboardMarkup(inline_keyboard=[
-    *[[InlineKeyboardButton(text=f'💳 {method}', callback_data=f"method:{method}")] for method in payment_methods],
+    *[[InlineKeyboardButton(text=f'💳 {method["name"]}', callback_data=f"method:{name}")] for name, method in payment_methods],
     [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel"),
      InlineKeyboardButton(text="◀️ Назад", callback_data="subscription:back")],
 ])
@@ -70,6 +70,11 @@ confirm_payment_menu = InlineKeyboardMarkup(inline_keyboard=[
 ])
 money_to_pay_menu = InlineKeyboardMarkup(inline_keyboard=[
     *[[InlineKeyboardButton(text=f'💵 {money} рублей', callback_data=f"confirm_payment:{money}")] for money in money_to_pay],
+    [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel"),
+     InlineKeyboardButton(text="◀️ Назад", callback_data="top_up")],
+])
+confirm_not_invoice_menu = InlineKeyboardMarkup(inline_keyboard=[
+    [InlineKeyboardButton(text="✅ Подтвердить", callback_data="confirm_payment:true")],
     [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel"),
      InlineKeyboardButton(text="◀️ Назад", callback_data="top_up")],
 ])

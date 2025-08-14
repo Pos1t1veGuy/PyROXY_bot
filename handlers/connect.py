@@ -22,10 +22,10 @@ connect_router = Router()
 
 class ConnectRouter:
     def __init__(self,
+                 db_handler: 'Handler',
                  server_host: str,
                  default_server_key: str,
-                 ciphers: List[str],
-                 db_handler: 'Handler'):
+                 ciphers: List[str]):
 
         global connect_router
         self.router = connect_router

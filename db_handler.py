@@ -35,6 +35,15 @@ class SQLite_Handler(Handler):
                     FOREIGN KEY (username) REFERENCES users(username)
                 );
             ''')
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS pending_payments (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    username TEXT NOT NULL,
+                    details TEXT NOT NULL,
+                    user_id INTEGER NOT NULL,
+                    requested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+            ''')
             conn.commit()
 
 
@@ -96,7 +105,7 @@ class SQLite_Handler(Handler):
 
     def pay(self, username: str, amount: int) -> bool:
         if amount <= 0:
-            return False  # нельзя пополнить отрицательной суммой
+            return False
         with sqlite3.connect(self.filepath) as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT balance FROM users WHERE username = ?", (username,))
@@ -200,3 +209,58 @@ class SQLite_Handler(Handler):
             first_buy_date = datetime.fromisoformat(result[0])
             now = datetime.now()
             return (now - first_buy_date).days < 3
+
+
+    def add_pending_payment(self, username: str, user_id: int, details: str,
+                            do_after: Optional[Callable[[str, int, str], None]] = None) -> bool:
+
+        with sqlite3.connect(self.filepath) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                INSERT INTO pending_payments (username, details, user_id)
+                VALUES (?, ?, ?)
+                """,
+                (username, details, user_id)
+            )
+            conn.commit()
+
+        if do_after:
+            do_after(username, user_id, details)
+
+        return True
+
+    def list_pending_payments(self) -> list:
+        with sqlite3.connect(self.filepath) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM pending_payments")
+            return cursor.fetchall()
+
+    def confirm_payment(self, payment_id: int, amount: int) -> bool:
+        with sqlite3.connect(self.filepath) as conn:
+            cursor = conn.cursor()
+
+            cursor.execute("SELECT username FROM pending_payments WHERE id = ?", (payment_id,))
+            row = cursor.fetchone()
+            if not row:
+                return False
+            username = row[0]
+
+            self.pay(username, amount)
+
+            cursor.execute("DELETE FROM pending_payments WHERE id = ?", (payment_id,))
+            conn.commit()
+        return True
+
+    def reject_payment(self, payment_id: int) -> bool:
+        with sqlite3.connect(self.filepath) as conn:
+            cursor = conn.cursor()
+
+            cursor.execute("SELECT id FROM pending_payments WHERE id = ?", (payment_id,))
+            if not cursor.fetchone():
+                return False
+
+            cursor.execute("DELETE FROM pending_payments WHERE id = ?", (payment_id,))
+            conn.commit()
+
+        return True

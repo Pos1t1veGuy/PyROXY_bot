@@ -19,7 +19,7 @@ bot = Bot(token=config["API_TOKEN"])
 dp = Dispatcher()
 
 db_handler = SQLite_Handler()
-dp.include_router(start.get_router(db_handler))
+dp.include_router(start.get_router(db_handler, author_link))
 dp.include_router(about.get_router(author_link))
 dp.include_router(connect.ConnectRouter(db_handler, host, DEFAULT_SERVER_KEY, ciphers).router)
 dp.include_router(subtion.SubtionRouter(db_handler, payment_methods, author_id).router)

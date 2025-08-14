@@ -5,7 +5,7 @@ from keyboards import main_menu, default_menu
 from aiogram.exceptions import TelegramBadRequest, TelegramAPIError
 
 
-def get_router(db_handler: 'Handler') -> Router:
+def get_router(db_handler: 'Handler', author_link: str) -> Router:
     router = Router()
 
     @router.message(Command("start"))
@@ -14,7 +14,8 @@ def get_router(db_handler: 'Handler') -> Router:
         await message.answer(
             "Привет! Я - Рокси, твой помощник для доступа к прокси-серверу PyROXY.\n\n"
             "Через меня ты можешь получить учётные данные для подключения к прокси и управлять доступом.\n\n"
-            "🔗 Мой создатель: [Pos1t1veGuy](https://github.com/Pos1t1veGuy)",
+            "[🔗 Гитхаб разработчика](https://github.com/Pos1t1veGuy)\n"
+            f"[🔗 Контакт с разработчиком]({author_link})",
             parse_mode="Markdown", reply_markup=main_menu
         )
 

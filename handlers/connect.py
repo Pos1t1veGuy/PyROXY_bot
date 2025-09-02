@@ -88,7 +88,7 @@ class ConnectRouter:
     async def choose_cipher(self, callback, state):
         if await self.subscriber_only(callback):
             sent = await callback.message.edit_text("🔒 <b>Требуется выбрать тип шифрования</b>, которым будет покрываться "
-                                                    "ваш трафик.\n\nℹ️ Подробнее о шифровании в главном меню, для"
+                                                    "ваш трафик.\n\nℹ️ Подробнее о шифровании в главном меню, для "
                                                     "наибольшей скорости поспользуйтесь <b>default</b> (без шифра).",
                                                     reply_markup=cipher_buttons_menu, parse_mode='HTML')
             await callback.answer()

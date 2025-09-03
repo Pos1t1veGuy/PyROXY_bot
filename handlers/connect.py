@@ -5,6 +5,7 @@ from keyboards import (cipher_buttons_menu, select_user_key_menu, default_menu, 
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.exceptions import TelegramBadRequest, TelegramAPIError
 from aiogram.types import BufferedInputFile, FSInputFile, Message, CallbackQuery
+from pathlib import Path
 import random
 import string
 import asyncio
@@ -190,13 +191,14 @@ class ConnectRouter:
             profile_data = (f'host={self.host}\nusername={username}\npassword={password}\nkey={key}\n'
                             f'cipher={cipher}\ndefault_key={self.default_server_key}').encode()
 
+            clients_url = 'https://github.com/Pos1t1veGuy/PyROXY/releases/tag/commerical'
             await callback.message.answer_document(
                 document=BufferedInputFile(profile_data, filename="profile.pyroxy"),
                 caption=(
                     "🔐 ИНСТРУКЦИЯ ПО ПОДКЛЮЧЕНИЮ:\n\n"
-                    "1️⃣ Скачайте архив `pyroxy_client.zip` и распакуйте его в любое удобное место, это ваш прокси-клиент.\n"
+                    f"1️⃣ Скачайте [ПРОКСИ-КЛИЕНТ]({clients_url}) под вашу систему.\n"
                     "2️⃣ Поместите файл `profile.pyroxy` в ту же папку, где находится распакованный клиент.\n"
-                    "3️⃣ Запустите `console_client.exe` или `no_console_client.exe` в папке клиента.\n\n"
+                    "3️⃣ Запустите `STARTER.exe`.\n\n"
                     "⚠️ Файл `profile.pyroxy` содержит:\n"
                     "• Ваш ключ авторизации\n"
                     "• Пароль\n"
@@ -206,10 +208,6 @@ class ConnectRouter:
                     "Я не несу ответственности за компрометацию данных и за трафик, проходящий через VPN.\n"
                 ),
                 reply_markup=default_menu, parse_mode='Markdown'
-            )
-            await callback.message.answer_document(
-                document=FSInputFile("pyroxy_client.zip"),
-                caption="📦 Это клиент PyROXY. Распакуйте архив и следуйте инструкции."
             )
         else:
             await callback.message.answer("⚠ Чтобы пользоваться VPN нужно преобрести платный доступ (либо воспользоваться"

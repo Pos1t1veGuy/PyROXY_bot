@@ -1,5 +1,6 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 import json
+import os
 
 config = json.load(open("config.json", 'r', encoding='utf-8'))
 bot_url = config["bot_url"]

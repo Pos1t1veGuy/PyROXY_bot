@@ -113,8 +113,8 @@ class SubtionRouter:
         asyncio.create_task(msg_timeout(state, sent, callback.bot))
 
     async def details_input_received(self, message, state):
-        self.db_handler.add_pending_payment(message.from_user.username, message.from_user.id, message.text.strip(),
-                                            do_after=self.after_not_invoice_payment)
+        payment_id = self.db_handler.add_pending_payment(message.from_user.username, message.from_user.id,
+                                                         message.text.strip(), do_after=self.after_not_invoice_payment)
         try:
             await message.delete()
         except Exception:
@@ -141,6 +141,7 @@ class SubtionRouter:
             await message.bot.send_message(
                 self.author_id,
                 f"💰 Новый запрос на пополнение!\n"
+                f"> {payment_id}\n"
                 f"👤 Пользователь: @{message.from_user.username} (ID: {message.from_user.id})\n"
                 f"📄 Детали: {message.text.strip()}"
             )

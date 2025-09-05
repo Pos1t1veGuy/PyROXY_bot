@@ -20,7 +20,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-async def process_pending_payments(db: SQLite_Handler, do_after: Callable[[str, int, str, bool], None]):
+async def process_pending_payments(db: SQLite_Handler, do_after: Callable[[str, int, str, bool, int], None]):
     payments = db.list_pending_payments()
 
     if not payments:
@@ -43,19 +43,19 @@ async def process_pending_payments(db: SQLite_Handler, do_after: Callable[[str, 
             if choice <= 0:
                 db.reject_payment(payment_id)
                 print("[-] Оплата отклонена.")
-                await do_after(username, user_id, details, choice > 0)
+                await do_after(username, user_id, details, choice > 0, choice)
                 continue
             else:
                 db.confirm_payment(payment_id, choice)
                 print("[+] Оплата подтверждена.")
-                await do_after(username, user_id, details, choice > 0)
+                await do_after(username, user_id, details, choice > 0, choice)
                 continue
         except ValueError:
             logger.warning(f"Некорректный ввод при оплате ID={payment_id}: {choice}")
             print("[!] Некорректный ввод, пропуск.")
 
 
-async def callback(username: str, user_id: int, details: str, accepted: bool):
+async def callback(username: str, user_id: int, details: str, accepted: bool, money: int):
     if accepted:
         status = "подтверждена"
         text = "✅ Ваш платёж успешно зачислен!"
@@ -65,11 +65,10 @@ async def callback(username: str, user_id: int, details: str, accepted: bool):
 
     try:
         await bot.send_message(user_id, text)
+        logger.info(f"Оплата от {username} ({user_id}) с деталями '{details}' {status}. Начислено {money}")
+        print(f"Оплата от {username} ({user_id}) с деталями '{details}' {status}.")
     except Exception as e:
         logger.error(f"Ошибка отправки уведомления пользователю {user_id}: {e}")
-
-    logger.info(f"CALLBACK: Оплата от {username} ({user_id}) с деталями '{details}' {status}.")
-    print(f"[CALLBACK] Оплата от {username} ({user_id}) с деталями '{details}' {status}.")
 
 
 if __name__ == "__main__":

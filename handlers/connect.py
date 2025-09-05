@@ -119,7 +119,7 @@ class ConnectRouter:
                 await callback.message.edit_text(f"✅ Используем прошлый ключ: ```{key}```",
                                               reply_markup=how_to_connect_menu, parse_mode='Markdown')
             else:
-                await message.edit_text(
+                await callback.message.edit_text(
                     "❌ Прошлый ключ не найден.", reply_markup=default_menu
                 )
             await callback.answer()
@@ -206,10 +206,6 @@ class ConnectRouter:
                     "Я не несу ответственности за компрометацию данных и за трафик, проходящий через VPN.\n"
                 ),
                 reply_markup=default_menu, parse_mode='Markdown'
-            )
-            await callback.message.answer_document(
-                document=FSInputFile("pyroxy_client.zip"),
-                caption="📦 Это клиент PyROXY. Распакуйте архив и следуйте инструкции."
             )
         else:
             await callback.message.answer("⚠ Чтобы пользоваться VPN нужно преобрести платный доступ (либо воспользоваться"

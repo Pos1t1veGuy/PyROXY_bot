@@ -212,7 +212,7 @@ class SQLite_Handler(Handler):
 
 
     def add_pending_payment(self, username: str, user_id: int, details: str,
-                            do_after: Optional[Callable[[str, int, str], None]] = None) -> bool:
+                            do_after: Optional[Callable[[str, int, str], None]] = None) -> int:
 
         with sqlite3.connect(self.filepath) as conn:
             cursor = conn.cursor()
@@ -223,12 +223,13 @@ class SQLite_Handler(Handler):
                 """,
                 (username, details, user_id)
             )
+            payment_id = cursor.lastrowid
             conn.commit()
 
         if do_after:
             do_after(username, user_id, details)
 
-        return True
+        return payment_id
 
     def list_pending_payments(self) -> list:
         with sqlite3.connect(self.filepath) as conn:
@@ -264,3 +265,13 @@ class SQLite_Handler(Handler):
             conn.commit()
 
         return True
+
+    def delete_user(self, username: str) -> bool:
+        with sqlite3.connect(self.filepath) as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM buys WHERE username = ?", (username,))
+            cursor.execute("DELETE FROM pending_payments WHERE username = ?", (username,))
+            cursor.execute("DELETE FROM users WHERE username = ?", (username,))
+            deleted = cursor.rowcount > 0
+            conn.commit()
+            return deleted

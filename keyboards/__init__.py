@@ -17,12 +17,11 @@ main_menu = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text="🔑 Подключение VPN", callback_data="connect")],
     [InlineKeyboardButton(text="💳 Доступ", callback_data="subscription")],
     [InlineKeyboardButton(text="🔒 Шифрование", callback_data="encryption_guide")],
-    [InlineKeyboardButton(text="❓ Как подключиться", callback_data="connect_guide")],
 ])
 
 password_menu = InlineKeyboardMarkup(inline_keyboard=[
-    [InlineKeyboardButton(text="♻️ Использовать предыдущий пароль", callback_data="use_last_pw")],
-    [InlineKeyboardButton(text="🎲 Сгенерировать случайный пароль", callback_data="generate_new_pw")],
+    [InlineKeyboardButton(text="♻️ Использовать созданный пароль", callback_data="use_last_pw")],
+    [InlineKeyboardButton(text="🎲 Сгенерировать новый пароль", callback_data="generate_new_pw")],
     [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel")],
 ])
 cipher_buttons_menu = InlineKeyboardMarkup(inline_keyboard=[

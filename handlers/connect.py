@@ -190,13 +190,14 @@ class ConnectRouter:
             profile_data = (f'host={self.host}\nusername={username}\npassword={password}\nkey={key}\n'
                             f'cipher={cipher}\ndefault_key={self.default_server_key}').encode()
 
+            clients_url = 'https://github.com/Pos1t1veGuy/PyROXY/releases/tag/commerical'
             await callback.message.answer_document(
                 document=BufferedInputFile(profile_data, filename="profile.pyroxy"),
                 caption=(
                     "🔐 ИНСТРУКЦИЯ ПО ПОДКЛЮЧЕНИЮ:\n\n"
-                    "1️⃣ Скачайте архив `pyroxy_client.zip` и распакуйте его в любое удобное место, это ваш прокси-клиент.\n"
+                    f"1️⃣ Скачайте [ПРОКСИ-КЛИЕНТ]({clients_url}) под вашу систему.\n"
                     "2️⃣ Поместите файл `profile.pyroxy` в ту же папку, где находится распакованный клиент.\n"
-                    "3️⃣ Запустите `console_client.exe` или `no_console_client.exe` в папке клиента.\n\n"
+                    "3️⃣ Запустите STARTER.exe.\n\n"
                     "⚠️ Файл `profile.pyroxy` содержит:\n"
                     "• Ваш ключ авторизации\n"
                     "• Пароль\n"

@@ -146,7 +146,7 @@ class ConnectRouter:
 
 
     async def key_input_received(self, message, state):
-        if await self.subscriber_only(message):
+        if await self.subscriber_only(message) and message.text:
             key = message.text.strip()
 
             data = await state.get_data()
@@ -236,9 +236,6 @@ class ConnectRouter:
                 case "AES_CTR":
                     return (len(key) in [16,24,32],
                         'ключ должен состоять из символов [a-z]+[0-9]+[_]+[-] длиной в 16/24/32 символа. Попробуйте снова')
-                case "AES_CBC":
-                    return (len(key) in [16,24,32],
-                        'ключ должен состоять из символов [a-z]+[0-9]+[_]+[-] длиной в 16/24/32 символа. Попробуйте снова')
                 case _:
                     return False, f'в валидации ключа {cipher_type}. Попробуйте позже'
 
@@ -255,8 +252,6 @@ class ConnectRouter:
                 return 'chacha20'
             case "AES_CTR":
                 return 'aes_ctr'
-            case "AES_CBC":
-                return 'aes_cbc'
             case _:
                 return 'none'
 

@@ -26,9 +26,8 @@ password_menu = InlineKeyboardMarkup(inline_keyboard=[
 ])
 cipher_buttons_menu = InlineKeyboardMarkup(inline_keyboard=[
     *[
-        [InlineKeyboardButton(text=f'🔒 {ciphers_names[i]}', callback_data=f"cipher:{ciphers_names[i]}"),
-         InlineKeyboardButton(text=f'🔒 {ciphers_names[i+1]}', callback_data=f"cipher:{ciphers_names[i+1]}")]
-        for i in range(0, len(ciphers_names), 2)
+        [InlineKeyboardButton(text=f'🔒 {ciphers_name}', callback_data=f"cipher:{ciphers_name}")]
+        for ciphers_name in ciphers_names
     ],
     [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel"),
      InlineKeyboardButton(text="◀️ Назад", callback_data="connect:back")],

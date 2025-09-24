@@ -1,7 +1,7 @@
 from typing import *
 from aiogram import Router, F
 from keyboards import (cipher_buttons_menu, select_user_key_menu, default_menu, how_to_connect_menu, balance_menu,
-                       select_tarif_menu, password_menu)
+                       select_tarif_menu, password_menu, region_menu)
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.exceptions import TelegramBadRequest, TelegramAPIError
 from aiogram.types import BufferedInputFile, FSInputFile, Message, CallbackQuery
@@ -23,14 +23,14 @@ connect_router = Router()
 class ConnectRouter:
     def __init__(self,
                  db_handler: 'Handler',
-                 server_host: str,
+                 clients_url: str,
                  default_server_key: str,
                  ciphers: List[str]):
 
         global connect_router
         self.router = connect_router
         self.db_handler = db_handler
-        self.host = server_host
+        self.clients_url = clients_url
         self.ciphers = ciphers
         self.default_server_key = default_server_key
 
@@ -40,6 +40,7 @@ class ConnectRouter:
 
         # password
         self.router.callback_query.register(self.cmd_connect, F.data.startswith("connect"))
+        self.router.callback_query.register(self.get_password, F.data.startswith("get_password"))
         self.router.callback_query.register(self.generate_pw, F.data == "generate_new_pw")
         self.router.callback_query.register(self.find_last_pw, F.data == "use_last_pw")
 
@@ -51,7 +52,6 @@ class ConnectRouter:
         self.router.callback_query.register(self.find_last_key, F.data == "use_last_key")
 
 
-
     async def cmd_connect(self, callback, state):
         if await self.subscriber_only(callback):
             if callback.data.split(":")[-1] == 'back':
@@ -59,11 +59,19 @@ class ConnectRouter:
             else:
                 method = callback.message.answer
 
-            sent = await method("🔒 <b>Нужно выбрать пароль</b>, с помощью которого вы будете проходить авторизацию в "
-                                "прокси сети.\n\n⚠️ Обратите внимание, что пароль нельзя показывать посторонним!",
-                                reply_markup=password_menu, parse_mode='HTML')
+            sent = await method("🌎 <b>Выберите регион сервера</b>, к которому будете подключаться.",
+                                reply_markup=region_menu, parse_mode='HTML')
             await callback.answer()
+            asyncio.create_task(msg_timeout(state, sent, callback.bot))
 
+    async def get_password(self, callback, state):
+        if await self.subscriber_only(callback):
+            cmd, ip, region = callback.data.split(":")
+            await state.update_data(ip=ip, region=region)
+            sent = await callback.message.edit_text(f"{region}\n\n🔒 <b>Нужно выбрать пароль</b>, с помощью которого "
+                                "вы будете проходить авторизацию в прокси сети.\n\n⚠️ Обратите внимание, что пароль "
+                                "нельзя показывать посторонним!", reply_markup=password_menu, parse_mode='HTML')
+            await callback.answer()
             asyncio.create_task(msg_timeout(state, sent, callback.bot))
 
     async def generate_pw(self, callback, state):
@@ -87,10 +95,12 @@ class ConnectRouter:
 
     async def choose_cipher(self, callback, state):
         if await self.subscriber_only(callback):
-            sent = await callback.message.edit_text("🔒 <b>Требуется выбрать тип шифрования</b>, которым будет покрываться "
-                                                    "ваш трафик.\n\nℹ️ Подробнее о шифровании в главном меню, для "
-                                                    "наибольшей скорости поспользуйтесь <b>default</b> (без шифра).",
-                                                    reply_markup=cipher_buttons_menu, parse_mode='HTML')
+            data = await state.get_data()
+            region = data.get("region")
+            sent = await callback.message.edit_text(f"{region}\n\n🔒 <b>Требуется выбрать тип шифрования</b>, которым "
+                                                    "будет покрываться ваш трафик.\n\nℹ️ Подробнее о шифровании в "
+                                                    "главном меню, для наибольшей скорости поспользуйтесь <b>default</b>"
+                                                    " (без шифра).", reply_markup=cipher_buttons_menu, parse_mode='HTML')
             await callback.answer()
 
             asyncio.create_task(msg_timeout(state, sent, callback.bot))
@@ -99,10 +109,12 @@ class ConnectRouter:
     async def generate_key(self, callback, state):
         if await self.subscriber_only(callback):
             await disable_msg_timeout(state)
+            data = await state.get_data()
+            region = data.get("region")
 
             new_key = self.generate_cipher_key().hex()
             if self.db_handler.save_key(callback.from_user.username, new_key):
-                await callback.message.edit_text(f"✅ Сгенерировала новый ключ: ```{new_key}```",
+                await callback.message.edit_text(f"{region}\n\n✅ Новый ключ: ```{new_key}```",
                                               reply_markup=how_to_connect_menu, parse_mode='Markdown')
             else:
                 await message.edit_text(
@@ -113,10 +125,12 @@ class ConnectRouter:
     async def find_last_key(self, callback, state):
         if await self.subscriber_only(callback):
             await disable_msg_timeout(state)
+            data = await state.get_data()
+            region = data.get("region")
 
             key = self.db_handler.find_key(callback.from_user.username)
             if key:
-                await callback.message.edit_text(f"✅ Используем прошлый ключ: ```{key}```",
+                await callback.message.edit_text(f"{region}\n\n✅ Используем прошлый ключ: ```{key}```",
                                               reply_markup=how_to_connect_menu, parse_mode='Markdown')
             else:
                 await callback.message.edit_text(
@@ -127,6 +141,8 @@ class ConnectRouter:
     async def input_key(self, callback, state):
         if await self.subscriber_only(callback):
             await disable_msg_timeout(state)
+            data = await state.get_data()
+            region = data.get("region")
 
             cipher_type = callback.data.split(":")[1]
 
@@ -137,7 +153,7 @@ class ConnectRouter:
                 self.db_handler.save_cipher(callback.from_user.username, cipher_type)
 
             msg = await callback.message.edit_text(
-                f"✅ `{cipher_type}`\nА теперь укажите **ключ шифрования** (просто строка с буквами):",
+                f"{region}\n\n✅ `{cipher_type}`\nА теперь укажите **ключ шифрования** (просто строка с буквами):",
                 reply_markup=select_user_key_menu, parse_mode='Markdown'
             )
             await state.update_data(cipher_type=cipher_type, last_msg_id=callback.message.message_id)
@@ -148,6 +164,8 @@ class ConnectRouter:
     async def key_input_received(self, message, state):
         if await self.subscriber_only(message) and message.text:
             key = message.text.strip()
+            data = await state.get_data()
+            region = data.get("region")
 
             data = await state.get_data()
             cipher_type = data.get("cipher_type")
@@ -167,7 +185,7 @@ class ConnectRouter:
                 await message.bot.edit_message_text(
                     chat_id=message.chat.id,
                     message_id=last_msg_id,
-                    text=f"✅ Ключ сохранен, вот его hex формат: `{hex_key}`",
+                    text=f"{region}\n\n✅ Ключ сохранен, вот его hex формат: `{hex_key}`",
                     reply_markup=how_to_connect_menu,
                     parse_mode='Markdown'
                 )
@@ -187,15 +205,16 @@ class ConnectRouter:
             key = self.db_handler.find_key(username)
             password = self.db_handler.find_password(username)
             cipher = self.cipher_to_parameter(self.db_handler.find_cipher(username))
-            profile_data = (f'host={self.host}\nusername={username}\npassword={password}\nkey={key}\n'
-                            f'cipher={cipher}\ndefault_key={self.default_server_key}').encode()
+            data = await state.get_data()
+            host = data.get("ip")
+            profile_data = (f'host={host}\nusername={username}\npassword={password}\nkey={key}\ncipher={cipher}\n'
+                            f'default_key={self.default_server_key}').encode()
 
-            clients_url = 'https://github.com/Pos1t1veGuy/PyROXY/releases/tag/commerical'
             await callback.message.answer_document(
                 document=BufferedInputFile(profile_data, filename="profile.pyroxy"),
                 caption=(
                     "🔐 ИНСТРУКЦИЯ ПО ПОДКЛЮЧЕНИЮ:\n\n"
-                    f"1️⃣ Скачайте [ПРОКСИ-КЛИЕНТ]({clients_url}) под вашу систему.\n"
+                    f"1️⃣ Скачайте [ПРОКСИ-КЛИЕНТ]({self.clients_url}) под вашу систему.\n"
                     "2️⃣ Поместите файл `profile.pyroxy` в ту же папку, где находится распакованный клиент.\n"
                     "3️⃣ Запустите STARTER.exe.\n\n"
                     "⚠️ Файл `profile.pyroxy` содержит:\n"
@@ -204,7 +223,7 @@ class ConnectRouter:
                     "• Настройки шифрования\n\n"
                     "🚫 Будьте осторожны!\n"
                     "Если файл попадёт в чужие руки, злоумышленники смогут использовать ваш аккаунт.\n"
-                    "Я не несу ответственности за компрометацию данных и за трафик, проходящий через VPN.\n"
+                    "Я не несу ответственности за компрометацию данных и за трафик, проходящий через VPN."
                 ),
                 reply_markup=default_menu, parse_mode='Markdown'
             )

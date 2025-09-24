@@ -7,6 +7,7 @@ ciphers_names = list(config["ciphers"].keys())
 payment_methods = config["payment_methods"].items()
 pricing = config["pricing"]
 money_to_pay = config["money_to_pay"]
+servers = config["servers"]
 
 
 default_menu = InlineKeyboardMarkup(inline_keyboard=[
@@ -19,10 +20,15 @@ main_menu = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text="🔒 Шифрование", callback_data="encryption_guide")],
 ])
 
+region_menu = InlineKeyboardMarkup(inline_keyboard=[
+    *[[InlineKeyboardButton(text=region, callback_data=f"get_password:{ip}:{region}")] for ip, region in servers.items()],
+    [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel")],
+])
 password_menu = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text="♻️ Использовать созданный пароль", callback_data="use_last_pw")],
     [InlineKeyboardButton(text="🎲 Сгенерировать новый пароль", callback_data="generate_new_pw")],
-    [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel")],
+    [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel"),
+     InlineKeyboardButton(text="◀️ Назад", callback_data="connect:back")],
 ])
 cipher_buttons_menu = InlineKeyboardMarkup(inline_keyboard=[
     *[
@@ -30,7 +36,7 @@ cipher_buttons_menu = InlineKeyboardMarkup(inline_keyboard=[
         for ciphers_name in ciphers_names
     ],
     [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel"),
-     InlineKeyboardButton(text="◀️ Назад", callback_data="connect:back")],
+     InlineKeyboardButton(text="◀️ Назад", callback_data="get_password:back")],
 ])
 how_to_connect_menu = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text="🏠 На главную", url=f"{bot_url}?start=main")],

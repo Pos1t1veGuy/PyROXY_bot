@@ -12,7 +12,7 @@ config = json.load(open(CONFIG_FILE, 'r', encoding='utf-8'))
 author_link = config['author_link']
 author_id = config['author_id']
 bot_url = config['bot_url']
-host = config['host']
+clients_url = config['clients_url']
 ciphers = config['ciphers']
 payment_methods = config['payment_methods']
 
@@ -23,7 +23,7 @@ db_handler = SQLite_Handler()
 main_router = Router()
 dp.include_router(start.get_router(db_handler, author_link))
 dp.include_router(about.get_router(author_link))
-dp.include_router(connect.ConnectRouter(db_handler, host, DEFAULT_SERVER_KEY, ciphers).router)
+dp.include_router(connect.ConnectRouter(db_handler, clients_url, DEFAULT_SERVER_KEY, ciphers).router)
 dp.include_router(subtion.SubtionRouter(db_handler, payment_methods, author_id).router)
 
 

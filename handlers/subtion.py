@@ -243,6 +243,6 @@ class SubtionRouter:
         if minutes > 0:
             parts.append(f"{minutes} мин.")
         if not parts:
-            parts.append(f"{seconds} сек.")  # если очень мало времени осталось
+            parts.append(f"{seconds} сек.")
 
         return "Ваш доступ активен еще " + " ".join(parts)

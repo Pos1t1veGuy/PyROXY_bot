@@ -1,7 +1,11 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from pathlib import Path
 import json
+import sys
 
-config = json.load(open("config.json", 'r', encoding='utf-8'))
+
+CONFIG_FILE = Path(__file__).parent.parent / 'config.json'
+config = json.load(open(CONFIG_FILE, 'r', encoding='utf-8'))
 bot_url = config["bot_url"]
 ciphers_names = list(config["ciphers"].keys())
 payment_methods = config["payment_methods"].items()

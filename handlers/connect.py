@@ -1,7 +1,5 @@
 from typing import *
 from aiogram import Router, F
-from keyboards import (cipher_buttons_menu, select_user_key_menu, default_menu, how_to_connect_menu, balance_menu,
-                       select_tarif_menu, password_menu, region_menu)
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.exceptions import TelegramBadRequest, TelegramAPIError
 from aiogram.types import BufferedInputFile, FSInputFile, Message, CallbackQuery
@@ -10,6 +8,8 @@ import string
 import asyncio
 import os
 
+from ..keyboards import (cipher_buttons_menu, select_user_key_menu, default_menu, how_to_connect_menu, balance_menu,
+                       select_tarif_menu, password_menu, region_menu)
 from .utils import msg_timeout, disable_msg_timeout
 
 

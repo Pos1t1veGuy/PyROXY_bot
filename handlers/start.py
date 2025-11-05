@@ -1,8 +1,9 @@
 from aiogram import Router, F
 from aiogram.types import Message
 from aiogram.filters import Command
-from keyboards import main_menu, default_menu
 from aiogram.exceptions import TelegramBadRequest, TelegramAPIError
+
+from ..keyboards import main_menu, default_menu
 
 
 def get_router(db_handler: 'Handler', author_link: str) -> Router:

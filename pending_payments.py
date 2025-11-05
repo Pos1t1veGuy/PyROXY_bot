@@ -5,7 +5,7 @@ import asyncio
 import json
 from aiogram import Bot
 
-from db_handler import SQLite_Handler
+from .db_handler import SQLite_Handler
 
 
 CONFIG_FILE = 'config.json'

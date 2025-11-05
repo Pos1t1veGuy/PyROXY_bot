@@ -2,10 +2,10 @@ from typing import *
 from aiogram import Router, F
 from aiogram.fsm.state import StatesGroup, State
 from datetime import datetime, timedelta
-from keyboards import (balance_menu, default_menu, payment_methods_menu, pricing_menu, money_to_pay_menu,
-                       confirm_buy_menu, confirm_payment_menu, confirm_not_invoice_menu)
 import asyncio
 
+from ..keyboards import (balance_menu, default_menu, payment_methods_menu, pricing_menu, money_to_pay_menu,
+                       confirm_buy_menu, confirm_payment_menu, confirm_not_invoice_menu)
 from .utils import msg_timeout, disable_msg_timeout
 
 

@@ -2,13 +2,13 @@ import json
 import asyncio
 import re
 from aiogram import Bot, Dispatcher, Router, F
-from handlers import start, about, connect, subtion
-from db_handler import SQLite_Handler
+from pathlib import Path
+from .handlers import start, about, connect, subtion
+from .db_handler import SQLite_Handler
+from .keyboards import config
 
-CONFIG_FILE = 'config.json'
-DEFAULT_SERVER_KEY = open('default_server_key', 'r').read()
 
-config = json.load(open(CONFIG_FILE, 'r', encoding='utf-8'))
+DEFAULT_SERVER_KEY = open(Path(__file__).parent / 'default_server_key', 'r').read()
 author_link = config['author_link']
 author_id = config['author_id']
 bot_url = config['bot_url']

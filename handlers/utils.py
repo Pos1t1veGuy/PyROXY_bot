@@ -1,7 +1,7 @@
 import asyncio
 from aiogram.exceptions import TelegramBadRequest, TelegramAPIError
 
-from keyboards import default_menu
+from ..keyboards import default_menu
 
 
 async def msg_timeout(state, sent, bot, timeout=60*5):

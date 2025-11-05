@@ -39,10 +39,12 @@ class SQLite_Handler(default_sqlite_handler):
                 return False
             username = row[0]
 
-            self.pay(username, amount)
+            if self.pay(username, amount):
+                cursor.execute("DELETE FROM pending_payments WHERE id = ?", (payment_id,))
+                conn.commit()
+            else:
+                return False
 
-            cursor.execute("DELETE FROM pending_payments WHERE id = ?", (payment_id,))
-            conn.commit()
         return True
 
     def reject_payment(self, payment_id: int) -> bool:

@@ -1,5 +1,6 @@
 import asyncio
 from aiogram.exceptions import TelegramBadRequest, TelegramAPIError
+from aiogram.types import Message, CallbackQuery
 
 from ..keyboards import default_menu
 
@@ -27,3 +28,6 @@ async def disable_msg_timeout(state):
     await state.update_data(
         last_send_time=-1
     )
+
+def format_username(object: Message | CallbackQuery) -> str:
+    return f'id_{object.from_user.id}'

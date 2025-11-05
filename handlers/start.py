@@ -4,6 +4,7 @@ from aiogram.filters import Command
 from aiogram.exceptions import TelegramBadRequest, TelegramAPIError
 
 from ..keyboards import main_menu, default_menu
+from .utils import format_username
 
 
 def get_router(db_handler: 'Handler', author_link: str) -> Router:
@@ -11,7 +12,7 @@ def get_router(db_handler: 'Handler', author_link: str) -> Router:
 
     @router.message(Command("start"))
     async def cmd_start(message):
-        db_handler.add_user(message.from_user.username)
+        db_handler.add_user(format_username(message))
         await message.answer(
             "Привет! Я - Рокси, твой помощник для доступа к прокси-серверу PyROXY.\n\n"
             "Через меня ты можешь получить учётные данные для подключения к прокси и управлять доступом.\n\n"

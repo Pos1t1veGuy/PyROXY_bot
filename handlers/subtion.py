@@ -6,7 +6,7 @@ import asyncio
 
 from ..keyboards import (balance_menu, default_menu, payment_methods_menu, pricing_menu, money_to_pay_menu,
                        confirm_buy_menu, confirm_payment_menu, confirm_not_invoice_menu)
-from .utils import msg_timeout, disable_msg_timeout
+from .utils import msg_timeout, disable_msg_timeout, format_username
 
 
 class DetailsInput(StatesGroup):
@@ -39,13 +39,13 @@ class SubtionRouter:
         self.router.callback_query.register(self.buy, F.data == "buy")
 
     async def cmd_subtion(self, callback):
-        balance = self.db_handler.get_user_balance(callback.from_user.username)
+        balance = self.db_handler.get_user_balance(format_username(callback))
         if callback.data.split(":")[-1] == 'back':
             method = callback.message.edit_text
         else:
             method = callback.message.answer
 
-        time_left = self.db_handler.get_access_expiry(callback.from_user.username)
+        time_left = self.db_handler.get_access_expiry(format_username(callback))
         access = f'\n{self.format_timedelta_until(time_left)}' if time_left else ''
         await method(f"💰 Ваш текущий баланс: *{balance}*{access}", reply_markup=balance_menu, parse_mode='Markdown')
         await callback.answer()
@@ -97,7 +97,7 @@ class SubtionRouter:
             sent = await callback.message.edit_text("Подтвердите оплату:", reply_markup=confirm_payment_menu)
         else:
             sent = await callback.message.edit_text(
-                "✏️ Пожалуйста, введите реквизиты, с которых был отправлен платёж.\n"
+                "✏️ Пожалуйста, введите реквизиты, с которых был или будет отправлен платёж.\n"
                 "Например:\n"
                 "• Номер карты\n"
                 "• Номер телефона, привязанного к карте\n\n"
@@ -113,7 +113,7 @@ class SubtionRouter:
         asyncio.create_task(msg_timeout(state, sent, callback.bot))
 
     async def details_input_received(self, message, state):
-        payment_id = self.db_handler.add_pending_payment(message.from_user.username, message.from_user.id,
+        payment_id = self.db_handler.add_pending_payment(format_username(message), message.from_user.id,
                                                          message.text.strip(), do_after=self.after_not_invoice_payment)
         try:
             await message.delete()
@@ -172,7 +172,7 @@ class SubtionRouter:
             start_parameter=f"proxy-{money}r",
             is_flexible=False
         )
-        self.db_handler.pay(callback.from_user.username, money)
+        self.db_handler.pay(format_username(callback), money)
         await callback.message.edit_text(f"🎉 Оплата прошла успешно! {method} {money}", reply_markup=default_menu)
 
     async def pricing(self, callback, state):
@@ -186,10 +186,11 @@ class SubtionRouter:
         once = once == 'True'
         once_str = ' Одноразовый!' if once else ''
 
-        if (self.db_handler.tarif_was(callback.from_user.username, tarif_name=name) and once) or not once:
+        if (self.db_handler.tarif_was(format_username(callback),
+                                      tarif_name=name) and once) or not once:
             await state.update_data(buy=name, price=price, days=days)
             subs = ''
-            if self.db_handler.is_subscriber(callback.from_user.username):
+            if self.db_handler.is_subscriber(format_username(callback)):
                 subs = f'При покупке нескольких тарифов итоговое время доступа складывается.\n'
             sent = await callback.message.edit_text(
                 f"📦 Доступ на {days} дней за {price} рублей.{once_str}\n{subs}Подтвердите покупку:",
@@ -205,13 +206,13 @@ class SubtionRouter:
 
     async def buy(self, callback, state):
         data = await state.get_data()
-        balance = self.db_handler.get_user_balance(callback.from_user.username)
+        balance = self.db_handler.get_user_balance(format_username(callback))
         money = int(data.get("price"))
         days = int(data.get("days"))
         buy_name = data.get("buy")
 
         if balance >= money:
-            if self.db_handler.buy(callback.from_user.username, buy_name, days, money):
+            if self.db_handler.buy(format_username(callback), buy_name, days, money):
                 await callback.message.edit_text("✅ Тариф преобретен, теперь можете подключаться)", reply_markup=default_menu)
                 await callback.answer()
             else:

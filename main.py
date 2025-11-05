@@ -19,7 +19,7 @@ payment_methods = config['payment_methods']
 bot = Bot(token=config["API_TOKEN"])
 dp = Dispatcher()
 
-db_handler = SQLite_Handler()
+db_handler = SQLite_Handler(Path(__file__).parent / 'db.sqlite3')
 main_router = Router()
 dp.include_router(start.get_router(db_handler, author_link))
 dp.include_router(about.get_router(author_link))
@@ -51,9 +51,13 @@ async def admin_message(message):
     payment_id = int(m_payment.group(1))
 
     if amount > 0:
-        db_handler.confirm_payment(payment_id, amount)
-        await message.reply(f"✅ Пользователю {user_id} зачислено {amount} руб.")
-        text = "✅ Ваш платёж успешно зачислен!"
+        if db_handler.confirm_payment(payment_id, amount):
+            await message.reply(f"✅ Пользователю {user_id} зачислено {amount} руб.")
+            text = "✅ Ваш платёж успешно зачислен!"
+        else:
+            await message.reply(f"❌ Невозможно начислить деньги пользователю {user_id}")
+            text = "❌ Ваш платёж отклонен!"
+
     else:
         db_handler.reject_payment(payment_id)
         await message.reply(f"❌ Пользователю {user_id} отказано в пополнении")

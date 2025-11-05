@@ -46,10 +46,12 @@ async def process_pending_payments(db: SQLite_Handler, do_after: Callable[[str, 
                 await do_after(username, user_id, details, choice > 0, choice)
                 continue
             else:
-                db.confirm_payment(payment_id, choice)
-                print("[+] Оплата подтверждена.")
-                await do_after(username, user_id, details, choice > 0, choice)
-                continue
+                if db.confirm_payment(payment_id, choice):
+                    print("[+] Оплата подтверждена.")
+                    await do_after(username, user_id, details, choice > 0, choice)
+                    continue
+                else:
+                    print("[!] Невозможно оплатить, вероятно пользователя нет в базе.")
         except ValueError:
             logger.warning(f"Некорректный ввод при оплате ID={payment_id}: {choice}")
             print("[!] Некорректный ввод, пропуск.")

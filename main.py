@@ -51,7 +51,7 @@ async def admin_message(message):
     payment_id = int(m_payment.group(1))
 
     if amount > 0:
-        if db_handler.confirm_payment(payment_id, amount):
+        if await db_handler.confirm_payment(payment_id, amount):
             await message.reply(f"✅ Пользователю {user_id} зачислено {amount} руб.")
             text = "✅ Ваш платёж успешно зачислен!"
         else:
@@ -59,16 +59,21 @@ async def admin_message(message):
             text = "❌ Ваш платёж отклонен!"
 
     else:
-        db_handler.reject_payment(payment_id)
+        await db_handler.reject_payment(payment_id)
         await message.reply(f"❌ Пользователю {user_id} отказано в пополнении")
         text = "❌ Ваш платёж отклонен!"
 
     await bot.send_message(user_id, text)
     await original.delete()
 
+async def main():
+    await db_handler.connect()
+    await dp.start_polling(bot)
+    await db_handler.close()
+
 
 dp.include_router(main_router)
 
 
 if __name__ == "__main__":
-    asyncio.run(dp.start_polling(bot))
+    asyncio.run(main())

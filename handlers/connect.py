@@ -79,14 +79,14 @@ class ConnectRouter:
             await disable_msg_timeout(state)
 
             new_pw = ''.join(random.choices(string.ascii_letters + string.digits, k=random.randint(8, 32)))
-            self.db_handler.save_password(format_username(callback), new_pw)
+            await self.db_handler.save_password(format_username(callback), new_pw)
 
             await self.choose_cipher(callback, state)
 
     async def find_last_pw(self, callback, state):
         if await self.subscriber_only(callback):
             await disable_msg_timeout(state)
-            pw = self.db_handler.find_password(format_username(callback))
+            pw = await self.db_handler.find_password(format_username(callback))
             if pw:
                 await self.choose_cipher(callback, state)
             else:
@@ -113,7 +113,7 @@ class ConnectRouter:
             region = data.get("region")
 
             new_key = self.generate_cipher_key().hex()
-            if self.db_handler.save_key(format_username(callback), new_key):
+            if await self.db_handler.save_key(format_username(callback), new_key):
                 await callback.message.edit_text(f"{region}\n\n✅ Новый ключ: ```{new_key}```",
                                               reply_markup=how_to_connect_menu, parse_mode='Markdown')
             else:
@@ -128,7 +128,7 @@ class ConnectRouter:
             data = await state.get_data()
             region = data.get("region")
 
-            key = self.db_handler.find_key(format_username(callback))
+            key = await self.db_handler.find_key(format_username(callback))
             if key:
                 await callback.message.edit_text(f"{region}\n\n✅ Используем прошлый ключ: ```{key}```",
                                               reply_markup=how_to_connect_menu, parse_mode='Markdown')
@@ -150,7 +150,7 @@ class ConnectRouter:
                 data = await state.get_data()
                 cipher_type = data.get("cipher_type")
             else:
-                self.db_handler.save_cipher(format_username(callback), cipher_type)
+                await self.db_handler.save_cipher(format_username(callback), cipher_type)
 
             msg = await callback.message.edit_text(
                 f"{region}\n\n✅ `{cipher_type}`\nА теперь укажите **ключ шифрования** (просто строка с буквами):",
@@ -181,7 +181,7 @@ class ConnectRouter:
                 return
 
             hex_key = key.encode().hex()
-            if self.db_handler.save_key(format_username(message), hex_key):
+            if await self.db_handler.save_key(format_username(message), hex_key):
                 await message.bot.edit_message_text(
                     chat_id=message.chat.id,
                     message_id=last_msg_id,
@@ -201,10 +201,10 @@ class ConnectRouter:
 
     async def connect_guide(self, callback, state):
         username = format_username(callback)
-        if self.db_handler.is_subscriber(username):
-            key = self.db_handler.find_key(username)
-            password = self.db_handler.find_password(username)
-            cipher = self.cipher_to_parameter(self.db_handler.find_cipher(username))
+        if await self.db_handler.is_subscriber(username):
+            key = await self.db_handler.find_key(username)
+            password = await self.db_handler.find_password(username)
+            cipher = self.cipher_to_parameter(await self.db_handler.find_cipher(username))
             data = await state.get_data()
             host = data.get("ip")
             profile_data = (f'host={host}\nusername={username}\npassword={password}\nkey={key}\ncipher={cipher}\n'
@@ -278,7 +278,7 @@ class ConnectRouter:
         return os.urandom(32)
 
     async def subscriber_only(self, event) -> bool:
-        if not self.db_handler.is_subscriber(format_username(event)):
+        if not await self.db_handler.is_subscriber(format_username(event)):
             text = "❌ Чтобы использовать эту функцию, активируйте доступ"
             if isinstance(event, CallbackQuery):
                 await event.message.answer(text, reply_markup=balance_menu)

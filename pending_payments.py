@@ -5,7 +5,7 @@ import asyncio
 import json
 from aiogram import Bot
 
-from .db_handler import SQLite_Handler
+from .db_handler import Handler, SQLite_Handler, PostgresHandler
 
 
 CONFIG_FILE = 'config.json'
@@ -20,8 +20,8 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-async def process_pending_payments(db: SQLite_Handler, do_after: Callable[[str, int, str, bool, int], None]):
-    payments = db.list_pending_payments()
+async def process_pending_payments(db: Handler, do_after: Callable[[str, int, str, bool, int], None]):
+    payments = await db.list_pending_payments()
 
     if not payments:
         print("Нет ожидающих оплат.")
@@ -41,12 +41,12 @@ async def process_pending_payments(db: SQLite_Handler, do_after: Callable[[str, 
         try:
             choice = float(input("Сколько денег начислено?: ").strip().lower())
             if choice <= 0:
-                db.reject_payment(payment_id)
+                await db.reject_payment(payment_id)
                 print("[-] Оплата отклонена.")
                 await do_after(username, user_id, details, choice > 0, choice)
                 continue
             else:
-                if db.confirm_payment(payment_id, choice):
+                if await db.confirm_payment(payment_id, choice):
                     print("[+] Оплата подтверждена.")
                     await do_after(username, user_id, details, choice > 0, choice)
                     continue
